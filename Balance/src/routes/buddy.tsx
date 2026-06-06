@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { BuddyMessageText } from "@/components/BuddyMessageText";
-import { sendBuddyMessage } from "@/lib/api/buddy.client";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/buddy")({
@@ -57,6 +56,7 @@ function BuddyPage() {
     setLoading(true);
 
     try {
+      const { sendBuddyMessage } = await import("@/lib/api/buddy.client");
       const { reply, notice } = await sendBuddyMessage(toApiMessages(nextMsgs));
       setMsgs((current) => [
         ...current,
