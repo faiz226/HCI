@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { createClientOnlyFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { BuddyMessageText } from "@/components/BuddyMessageText";
 import { toast } from "sonner";
+
+const getSendBuddyMessage = createClientOnlyFn(
+  () => import("@/lib/api/buddy.client").then((m) => m.sendBuddyMessage)
+);
 
 export const Route = createFileRoute("/buddy")({
   head: () => ({
@@ -56,7 +61,8 @@ function BuddyPage() {
     setLoading(true);
 
     try {
-      const { sendBuddyMessage } = await import("@/lib/api/buddy.client");
+      const sendBuddyMessage = await getSendBuddyMessage();
+      if (!sendBuddyMessage) throw new Error("client only");
       const { reply, notice } = await sendBuddyMessage(toApiMessages(nextMsgs));
       setMsgs((current) => [
         ...current,
