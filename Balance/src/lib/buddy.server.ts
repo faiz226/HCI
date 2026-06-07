@@ -14,6 +14,27 @@ export type BuddyChatResult = {
   notice: BuddyNotice | null;
 };
 
+export type UserContext = {
+  name: string;
+  email: string;
+  petalCount: number;
+  petalsToNextBloom: number;
+  balanceScore: number;
+  balanceLabel: string;
+  studyHours: number;
+  personalHours: number;
+  restHours: number;
+  italeemConnected: boolean;
+  language: string;
+  tasks: {
+    title: string;
+    category: string;
+    bucket: string;
+    when: string;
+    done: boolean;
+  }[];
+};
+
 // ─── Fallback Messages ────────────────────────────────────────────────────────
 
 const FALLBACK_BY_NOTICE: Record<BuddyNotice, string> = {
@@ -65,7 +86,7 @@ A chat interface. Quick-start chips: "Help me unwind", "Plan my afternoon", "I f
 Shows weekly time balance as a score and label: Balanced, Finding rhythm, or Needs rest. Three sliders: Study time (0–40 hrs), Personal and social time (0–30 hrs), Deep rest (0–80 hrs). Ideal ratio is roughly 20% study, 15% personal, 65% rest. A Reset button restores defaults: study 14.5, personal 8.2, rest 52.4. A crisis FAB in the bottom-right goes to /crisis.
 
 /rewards — Rewards
-Shows petal count (128 petals) and progress toward next bloom (200 petals). Badges: earned ones are Steady Breath (7 mindful pauses), Deep Reader (10 focused hours), Restful Week (50+ hrs sleep). Unearned: Connected (reach out 5 times), Soft Steps (3 walks), Kindness (write a note to a friend). Tapping any badge opens a description dialog.
+Shows petal count and progress toward next bloom. Badges: earned ones are Steady Breath (7 mindful pauses), Deep Reader (10 focused hours), Restful Week (50+ hrs sleep). Unearned: Connected (reach out 5 times), Soft Steps (3 walks), Kindness (write a note to a friend). Tapping any badge opens a description dialog.
 
 /profile — Profile
 A hanging ID card with name, role (KICT Student), and badge ID. Edit form for display name and email. Shows Balance score and Petal count. If signed out, shows a sign-in button.
@@ -156,6 +177,59 @@ Never use the exact same boundary response twice in a row — vary your phrasing
 Never output markdown. Plain text only.
 Never diagnose. Never act as a substitute for professional help.`;
 
+// ─── Dynamic Prompt Builder ───────────────────────────────────────────────────
+
+function buildSystemPrompt(context: UserContext): string {
+  const pendingToday = context.tasks.filter(
+    (t) => t.bucket === "Today" && !t.done
+  );
+  const pendingTomorrow = context.tasks.filter(
+    (t) => t.bucket === "Tomorrow" && !t.done
+  );
+  const pendingLater = context.tasks.filter(
+    (t) => t.bucket === "Later" && !t.done
+  );
+  const completedCount = context.tasks.filter((t) => t.done).length;
+
+  const formatTask = (t: UserContext["tasks"][number]) =>
+    `  - ${t.title} (${t.category}, ${t.when})`;
+
+  const taskLines = [
+    pendingToday.length > 0
+      ? `Today (${pendingToday.length} pending):\n${pendingToday.map(formatTask).join("\n")}`
+      : "Today: all done ✓",
+    pendingTomorrow.length > 0
+      ? `Tomorrow (${pendingTomorrow.length} pending):\n${pendingTomorrow.map(formatTask).join("\n")}`
+      : "Tomorrow: nothing pending",
+    pendingLater.length > 0
+      ? `Later (${pendingLater.length} pending):\n${pendingLater.map(formatTask).join("\n")}`
+      : "Later: nothing pending",
+  ].join("\n\n");
+
+  const firstName = context.name.split(" ")[0];
+
+  return `${BUDDY_SYSTEM}
+
+## Current User Context
+Use this information naturally in conversation when it's relevant. Don't recite it robotically — weave it in like a friend who already knows these things about you.
+
+Name: ${context.name} (call them ${firstName} in conversation)
+Balance score: ${context.balanceScore}% — ${context.balanceLabel}
+This week: ${context.studyHours}hrs study, ${context.personalHours}hrs personal, ${context.restHours}hrs rest
+Petals: ${context.petalCount} collected, ${context.petalsToNextBloom} more to next bloom
+i-Taleem: ${context.italeemConnected ? "connected" : "not connected"}
+Language preference: ${context.language === "ms" ? "Bahasa Melayu" : "English"}
+
+Tasks:
+${taskLines}
+
+Completed today: ${completedCount} task${completedCount !== 1 ? "s" : ""} done
+
+If i-Taleem is not connected and it comes up naturally, you can gently mention they can connect it under Settings then Integrations.
+If their balance score is low or rest is lacking, factor that into how you respond — don't push productivity at someone who needs rest.
+If they ask about their tasks, petals, or balance, you can answer directly from the data above.`;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buddyNoticeFromError(error: unknown): BuddyNotice {
@@ -172,13 +246,14 @@ function buddyNoticeFromError(error: unknown): BuddyNotice {
 
 export async function handleBuddyMessage(
   messages: BuddyChatMessage[],
+  context: UserContext,
 ): Promise<BuddyChatResult> {
   const lastUserMsg =
     messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
 
   try {
     const reply = await chatWithOpenRouter([
-      { role: "system", content: BUDDY_SYSTEM },
+      { role: "system", content: buildSystemPrompt(context) },
       ...messages,
     ]);
 

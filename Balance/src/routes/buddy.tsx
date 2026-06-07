@@ -4,6 +4,10 @@ import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { BuddyMessageText } from "@/components/BuddyMessageText";
 import { toast } from "sonner";
+import { useSession } from "@/lib/session-store";
+import { useTasks } from "@/lib/tasks-store";
+import { useBalance, computeBalanceScore } from "@/lib/balance-store";
+import { useSettings } from "@/lib/settings-store";
 
 const getSendBuddyMessage = createClientOnlyFn(
   () => import("@/lib/api/buddy.client").then((m) => m.sendBuddyMessage)
@@ -21,16 +25,6 @@ export const Route = createFileRoute("/buddy")({
 
 type Msg = { id: string; role: "buddy" | "me"; text: string };
 
-const SEED: Msg[] = [
-  { id: "1", role: "buddy", text: "How is your heart today, Aisyah?" },
-  { id: "2", role: "me", text: "A little stretched. Three deadlines this week." },
-  {
-    id: "3",
-    role: "buddy",
-    text: "That's a lot to carry at once. Want to pick just one to soften first?",
-  },
-];
-
 const STORAGE_KEY = "soft-oasis-buddy-chat";
 
 const SUGGESTIONS = [
@@ -47,7 +41,24 @@ function toApiMessages(msgs: Msg[]) {
   }));
 }
 
+// Petals are fixed at 128, next bloom at 200 — matches rewards page
+const PETAL_COUNT = 128;
+const NEXT_BLOOM = 200;
+
 function BuddyPage() {
+  const session = useSession();
+  const tasks = useTasks();
+  const balance = useBalance();
+  const settings = useSettings();
+
+  const { score, label } = computeBalanceScore(balance);
+
+  const firstName = session.name.split(" ")[0];
+
+  const SEED: Msg[] = [
+    { id: "seed-1", role: "buddy", text: `How is your heart today, ${firstName}?` },
+  ];
+
   const [msgs, setMsgs] = useState<Msg[]>(SEED);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -88,10 +99,32 @@ function BuddyPage() {
     setInput("");
     setLoading(true);
 
+    // Build fresh context snapshot at send time
+    const context = {
+      name: session.name,
+      email: session.email,
+      petalCount: PETAL_COUNT,
+      petalsToNextBloom: NEXT_BLOOM - PETAL_COUNT,
+      balanceScore: score,
+      balanceLabel: label,
+      studyHours: balance.study,
+      personalHours: balance.personal,
+      restHours: balance.rest,
+      italeemConnected: settings.italeemConnected,
+      language: settings.language,
+      tasks: tasks.map((t) => ({
+        title: t.title,
+        category: t.category,
+        bucket: t.bucket,
+        when: t.when,
+        done: t.done,
+      })),
+    };
+
     try {
       const sendBuddyMessage = await getSendBuddyMessage();
       if (!sendBuddyMessage) throw new Error("client only");
-      const { reply, notice } = await sendBuddyMessage(toApiMessages(nextMsgs));
+      const { reply, notice } = await sendBuddyMessage(toApiMessages(nextMsgs), context);
       setMsgs((current) => [
         ...current,
         { id: String(Date.now() + 1), role: "buddy", text: reply },
