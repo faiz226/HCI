@@ -1,15 +1,15 @@
 import { chatWithOpenRouter, OpenRouterError } from "./openrouter.server";
-import { Redis } from "@upstash/redis";
 
-let redis: Redis | null = null;
+let redisClient: { get: (key: string) => Promise<unknown>; set: (key: string, value: string) => Promise<unknown>; zadd: (key: string, score: number, member: string) => Promise<unknown>; zremrangebyrank: (key: string, start: number, stop: number) => Promise<unknown> } | null = null;
 
-function getRedis(): Redis | null {
+async function getRedis() {
+  if (redisClient) return redisClient;
   try {
-    const url = process.env.KV_REST_API_URL?.trim();
-    const token = process.env.KV_REST_API_TOKEN?.trim();
-    if (!url || !token) return null;
-    if (!redis) redis = new Redis({ url, token });
-    return redis;
+    const url = process.env.REDIS_URL?.trim();
+    if (!url) return null;
+    const { Redis } = await import("@upstash/redis");
+    redisClient = new Redis({ url, token: "" });
+    return redisClient;
   } catch {
     return null;
   }
@@ -192,41 +192,45 @@ async function logConversation(
   buddyReply: string,
   notice: BuddyNotice | null,
 ) {
-  const db = getRedis();
-  if (!db) return;
-
   try {
+    const url = process.env.REDIS_URL?.trim();
+    if (!url) return;
+
+    const { Redis } = await import("@upstash/redis");
+    const db = Redis.fromEnv();
+
     const timestamp = new Date().toISOString();
     const id = `chat:${Date.now()}`;
+
     await db.set(id, JSON.stringify({
       timestamp,
       userMessage,
       buddyReply,
       notice,
     }));
-    // Keep a sorted list of all chat IDs by timestamp
+
     await db.zadd("chat:index", { score: Date.now(), member: id });
-    // Keep only last 1000 conversations to avoid storage limit
     await db.zremrangebyrank("chat:index", 0, -1001);
-  } catch {
-    // Logging failure should never break the chat
+
+    console.log(`[Chat Log] Saved: ${id}`);
+  } catch (err) {
+    console.warn("[Chat Log] Failed to save:", err);
   }
 }
 
 export async function handleBuddyMessage(messages: BuddyChatMessage[]): Promise<BuddyChatResult> {
+  const lastUserMsg = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+
   try {
     const reply = await chatWithOpenRouter([
       { role: "system", content: BUDDY_SYSTEM },
       ...messages,
     ]);
 
-    const lastUserMsg = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
     void logConversation(lastUserMsg, reply, null);
-
     return { reply, notice: null };
   } catch (error) {
     const notice = buddyNoticeFromError(error);
-    const lastUserMsg = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
     void logConversation(lastUserMsg, FALLBACK_BY_NOTICE[notice], notice);
     return { reply: FALLBACK_BY_NOTICE[notice], notice };
   }
