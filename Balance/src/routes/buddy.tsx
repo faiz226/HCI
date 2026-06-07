@@ -78,8 +78,8 @@ function BuddyPage() {
           description: "The AI service was slow. You can send another message when ready.",
         });
       } else if (notice === "config") {
-        toast.error("Buddy isn't configured", {
-          description: "Set OPENROUTER_API_KEY in .env and restart the dev server.",
+        toast.error("Buddy is unavailable", {
+    description: "Something went wrong on our end. Please try again shortly.",
         });
       } else if (notice) {
         toast.error("Buddy couldn't connect right now", {

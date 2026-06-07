@@ -159,7 +159,7 @@ const FALLBACK_BY_NOTICE: Record<BuddyNotice, string> = {
   offline:
     "I'm having trouble reaching you right now. Take a slow breath — we can try again whenever you're ready.",
   config:
-    "Buddy isn't connected to the AI service yet. Add GEMINI_API_KEY or GROQ_API_KEY to the server environment.",
+    "Buddy is taking a short break right now. Please try again in a moment! 🌿",
 };
 
 function buddyNoticeFromError(error: unknown): BuddyNotice {
