@@ -1,17 +1,35 @@
 import { chatWithOpenRouter, OpenRouterError } from "./openrouter.server";
 
-let redisClient: { get: (key: string) => Promise<unknown>; set: (key: string, value: string) => Promise<unknown>; zadd: (key: string, score: number, member: string) => Promise<unknown>; zremrangebyrank: (key: string, start: number, stop: number) => Promise<unknown> } | null = null;
-
-async function getRedis() {
-  if (redisClient) return redisClient;
+async function logConversation(
+  userMessage: string,
+  buddyReply: string,
+  notice: BuddyNotice | null,
+) {
   try {
-    const url = process.env.REDIS_URL?.trim();
-    if (!url) return null;
-    const { Redis } = await import("@upstash/redis");
-    redisClient = new Redis({ url, token: "" });
-    return redisClient;
-  } catch {
-    return null;
+    const redisUrl = process.env.REDIS_URL?.trim();
+    if (!redisUrl) return;
+
+    const { default: Redis } = await import("ioredis");
+    const redis = new Redis(redisUrl, { tls: undefined, lazyConnect: true });
+    await redis.connect();
+
+    const timestamp = new Date().toISOString();
+    const id = `chat:${Date.now()}`;
+
+    await redis.set(id, JSON.stringify({
+      timestamp,
+      userMessage,
+      buddyReply,
+      notice,
+    }));
+
+    await redis.zadd("chat:index", Date.now(), id);
+    await redis.zremrangebyrank("chat:index", 0, -1001);
+
+    await redis.quit();
+    console.log(`[Chat Log] Saved: ${id}`);
+  } catch (err) {
+    console.warn("[Chat Log] Failed to save:", err);
   }
 }
 
@@ -185,37 +203,6 @@ function buddyNoticeFromError(error: unknown): BuddyNotice {
     if (error.reason === "network") return "offline";
   }
   return "offline";
-}
-
-async function logConversation(
-  userMessage: string,
-  buddyReply: string,
-  notice: BuddyNotice | null,
-) {
-  try {
-    const url = process.env.REDIS_URL?.trim();
-    if (!url) return;
-
-    const { Redis } = await import("@upstash/redis");
-    const db = Redis.fromEnv();
-
-    const timestamp = new Date().toISOString();
-    const id = `chat:${Date.now()}`;
-
-    await db.set(id, JSON.stringify({
-      timestamp,
-      userMessage,
-      buddyReply,
-      notice,
-    }));
-
-    await db.zadd("chat:index", { score: Date.now(), member: id });
-    await db.zremrangebyrank("chat:index", 0, -1001);
-
-    console.log(`[Chat Log] Saved: ${id}`);
-  } catch (err) {
-    console.warn("[Chat Log] Failed to save:", err);
-  }
 }
 
 export async function handleBuddyMessage(messages: BuddyChatMessage[]): Promise<BuddyChatResult> {

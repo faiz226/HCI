@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClientOnlyFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { AppShell } from "@/components/AppShell";
 import { BuddyMessageText } from "@/components/BuddyMessageText";
 import { toast } from "sonner";
@@ -31,6 +31,8 @@ const SEED: Msg[] = [
   },
 ];
 
+const STORAGE_KEY = "soft-oasis-buddy-chat";
+
 const SUGGESTIONS = [
   "Help me unwind",
   "Plan my afternoon",
@@ -49,6 +51,32 @@ function BuddyPage() {
   const [msgs, setMsgs] = useState<Msg[]>(SEED);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const initialized = useRef(false);
+
+  // Load from sessionStorage once on mount
+  useEffect(() => {
+    if (initialized.current) return;
+    initialized.current = true;
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Msg[];
+        if (parsed.length > 0) setMsgs(parsed);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Save to sessionStorage whenever messages change
+  useEffect(() => {
+    if (!initialized.current) return;
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
+    } catch {
+      // ignore
+    }
+  }, [msgs]);
 
   const send = async (text: string) => {
     const trimmed = text.trim();
@@ -71,15 +99,15 @@ function BuddyPage() {
 
       if (notice === "rate_limit") {
         toast.message("Buddy is a little busy", {
-          description: "OpenRouter is rate-limiting requests. Wait a moment, then try again.",
+          description: "Wait a moment, then try again.",
         });
       } else if (notice === "timeout") {
         toast.message("That took a while", {
-          description: "The AI service was slow. You can send another message when ready.",
+          description: "The AI service was slow. Send another message when ready.",
         });
       } else if (notice === "config") {
         toast.error("Buddy is unavailable", {
-    description: "Something went wrong on our end. Please try again shortly.",
+          description: "Something went wrong on our end. Please try again shortly.",
         });
       } else if (notice) {
         toast.error("Buddy couldn't connect right now", {
