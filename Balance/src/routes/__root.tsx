@@ -60,7 +60,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          
+          <a
             href="/"
             className="inline-flex items-center justify-center rounded-full border border-outline-variant bg-surface-white px-5 py-2 text-sm font-medium text-on-surface hover:bg-surface-container"
           >
