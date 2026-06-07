@@ -234,12 +234,17 @@ export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Pro
 
   for (const provider of providers) {
     try {
-      return await provider.fn(messages);
+      console.log(`[Buddy] Trying provider: ${provider.name}`);
+      const result = await provider.fn(messages);
+      console.log(`[Buddy] ✅ Success with: ${provider.name}`);
+      return result;
     } catch (error) {
       const normalized =
         error instanceof OpenRouterError
           ? error
           : new OpenRouterError(`${provider.name} failed`, "api", { cause: error });
+
+      console.warn(`[Buddy] ❌ ${provider.name} failed — reason: ${normalized.reason}, status: ${normalized.status ?? "N/A"}`);
 
       lastError = normalized;
 
@@ -253,5 +258,6 @@ export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Pro
     }
   }
 
+  console.error("[Buddy] 💀 All providers failed");
   throw lastError ?? new OpenRouterError("All providers failed", "api");
 }
