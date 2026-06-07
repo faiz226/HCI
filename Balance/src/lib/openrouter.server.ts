@@ -47,7 +47,7 @@ async function callCerebras(messages: OpenRouterChatMessage[]): Promise<string> 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama3.3-70b",
+  model: "gpt-oss-120b",
       messages,
       max_tokens: 768,
       temperature: 0.65,
