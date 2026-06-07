@@ -66,6 +66,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Go home
           </a>
+Press Ctrl+S, then back in Command Prompt:
+cmdcd C:\Users\ASUS\Documents\GitHub\HCI
+git add Balance/src/routes/__root.tsx
+git commit -m "Fix missing opening anchor tag in ErrorComponent"
+git push origin main
+The only difference is adding <a on its own line after </button>. That one missing tag is what's breaking the entire build.
         </div>
       </div>
     </div>
