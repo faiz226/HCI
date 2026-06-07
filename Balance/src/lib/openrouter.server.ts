@@ -1,8 +1,9 @@
 import process from "node:process";
 
-const GEMINI_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
 
 export type OpenRouterChatMessage = {
   role: "system" | "user" | "assistant";
@@ -33,6 +34,79 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// ─── Cerebras ───────────────────────────────────────────────────────────────
+async function callCerebras(messages: OpenRouterChatMessage[]): Promise<string> {
+  const apiKey = process.env.CEREBRAS_API_KEY?.trim();
+  if (!apiKey) throw new OpenRouterError("CEREBRAS_API_KEY not configured", "config");
+
+  const response = await fetch(CEREBRAS_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b",
+      messages,
+      max_tokens: 768,
+      temperature: 0.65,
+    }),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    if (status === 429) throw new OpenRouterError("Cerebras rate limit", "rate_limit", { status, retryable: true });
+    if (status === 401 || status === 403) throw new OpenRouterError("Cerebras auth failed", "config", { status });
+    throw new OpenRouterError(`Cerebras error ${status}`, "api", { status, retryable: true });
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new OpenRouterError("Cerebras returned empty reply", "api", { retryable: true });
+
+  return text;
+}
+
+// ─── Groq ────────────────────────────────────────────────────────────────────
+async function callGroq(messages: OpenRouterChatMessage[]): Promise<string> {
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey) throw new OpenRouterError("GROQ_API_KEY not configured", "config");
+
+  const response = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "llama-3.3-70b-versatile",
+      messages,
+      max_tokens: 768,
+      temperature: 0.65,
+    }),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    if (status === 429) throw new OpenRouterError("Groq rate limit", "rate_limit", { status, retryable: true });
+    if (status === 401 || status === 403) throw new OpenRouterError("Groq auth failed", "config", { status });
+    throw new OpenRouterError(`Groq error ${status}`, "api", { status, retryable: true });
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new OpenRouterError("Groq returned empty reply", "api", { retryable: true });
+
+  return text;
+}
+
+// ─── Gemini ──────────────────────────────────────────────────────────────────
 async function callGemini(messages: OpenRouterChatMessage[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey) throw new OpenRouterError("GEMINI_API_KEY not configured", "config");
@@ -73,18 +147,19 @@ async function callGemini(messages: OpenRouterChatMessage[]): Promise<string> {
   return text;
 }
 
-async function callGroq(messages: OpenRouterChatMessage[]): Promise<string> {
-  const apiKey = process.env.GROQ_API_KEY?.trim();
-  if (!apiKey) throw new OpenRouterError("GROQ_API_KEY not configured", "config");
+// ─── Mistral ─────────────────────────────────────────────────────────────────
+async function callMistral(messages: OpenRouterChatMessage[]): Promise<string> {
+  const apiKey = process.env.MISTRAL_API_KEY?.trim();
+  if (!apiKey) throw new OpenRouterError("MISTRAL_API_KEY not configured", "config");
 
-  const response = await fetch(GROQ_URL, {
+  const response = await fetch(MISTRAL_URL, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "llama-3.3-70b-versatile",
+      model: "mistral-small-latest",
       messages,
       max_tokens: 768,
       temperature: 0.65,
@@ -93,9 +168,9 @@ async function callGroq(messages: OpenRouterChatMessage[]): Promise<string> {
 
   if (!response.ok) {
     const status = response.status;
-    if (status === 429) throw new OpenRouterError("Groq rate limit", "rate_limit", { status, retryable: true });
-    if (status === 401 || status === 403) throw new OpenRouterError("Groq auth failed", "config", { status });
-    throw new OpenRouterError(`Groq error ${status}`, "api", { status, retryable: true });
+    if (status === 429) throw new OpenRouterError("Mistral rate limit", "rate_limit", { status, retryable: true });
+    if (status === 401 || status === 403) throw new OpenRouterError("Mistral auth failed", "config", { status });
+    throw new OpenRouterError(`Mistral error ${status}`, "api", { status, retryable: true });
   }
 
   const data = (await response.json()) as {
@@ -103,26 +178,44 @@ async function callGroq(messages: OpenRouterChatMessage[]): Promise<string> {
   };
 
   const text = data.choices?.[0]?.message?.content?.trim();
-  if (!text) throw new OpenRouterError("Groq returned empty reply", "api", { retryable: true });
+  if (!text) throw new OpenRouterError("Mistral returned empty reply", "api", { retryable: true });
 
   return text;
 }
 
+// ─── Failover chain ──────────────────────────────────────────────────────────
 export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Promise<string> {
-  // Try Gemini first, fall back to Groq
-  try {
-    return await callGemini(messages);
-  } catch (geminiError) {
-    if (geminiError instanceof OpenRouterError && geminiError.reason === "config") {
-      throw geminiError; // No key configured, don't try Groq
-    }
-    // Gemini failed, try Groq
-    await sleep(500);
+  const providers = [
+    { name: "Cerebras", fn: callCerebras },
+    { name: "Groq", fn: callGroq },
+    { name: "Gemini", fn: callGemini },
+    { name: "Mistral", fn: callMistral },
+  ];
+
+  let lastError: OpenRouterError | undefined;
+
+  for (const provider of providers) {
     try {
-      return await callGroq(messages);
-    } catch (groqError) {
-      // Both failed, throw the Groq error
-      throw groqError;
+      return await provider.fn(messages);
+    } catch (error) {
+      const normalized =
+        error instanceof OpenRouterError
+          ? error
+          : new OpenRouterError(`${provider.name} failed`, "api", { cause: error });
+
+      lastError = normalized;
+
+      // Don't try next provider if it's a config error for this provider
+      // But DO try next if it's rate limited or API error
+      if (normalized.reason === "config") {
+        continue; // key not set, skip to next provider
+      }
+      if (normalized.reason === "rate_limit" || normalized.reason === "api") {
+        await sleep(300);
+        continue; // try next provider
+      }
     }
   }
+
+  throw lastError ?? new OpenRouterError("All providers failed", "api");
 }
