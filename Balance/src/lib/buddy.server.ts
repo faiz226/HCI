@@ -17,6 +17,8 @@ export type BuddyChatResult = {
 export type UserContext = {
   name: string;
   email: string;
+  currentTime: string;
+  currentDate: string;
   petalCount: number;
   petalsToNextBloom: number;
   balanceScore: number;
@@ -174,21 +176,15 @@ Never introduce yourself with a stiff robotic line like "I'm Buddy, your Soft Oa
 Never give generic productivity advice to someone who is clearly exhausted.
 Never suggest anything that conflicts with prayer times or Ramadan fasting without reading the context first.
 Never use the exact same boundary response twice in a row — vary your phrasing.
-Never diagnose. Never act as a substitute for professional help.
-CRITICAL: Never output any markdown whatsoever. No bold, no asterisks, no backticks, no headers, no bullet points, no numbered lists. If you want to emphasize a task name or word, just write it plainly. Plain text only, always, no exceptions.`;
+CRITICAL: Never output any markdown whatsoever. No bold, no asterisks, no backticks, no headers, no bullet points, no numbered lists. If you want to emphasize a task name or word, just write it plainly. Plain text only, always, no exceptions.
+Never diagnose. Never act as a substitute for professional help.`;
 
 // ─── Dynamic Prompt Builder ───────────────────────────────────────────────────
 
 function buildSystemPrompt(context: UserContext): string {
-  const pendingToday = context.tasks.filter(
-    (t) => t.bucket === "Today" && !t.done
-  );
-  const pendingTomorrow = context.tasks.filter(
-    (t) => t.bucket === "Tomorrow" && !t.done
-  );
-  const pendingLater = context.tasks.filter(
-    (t) => t.bucket === "Later" && !t.done
-  );
+  const pendingToday = context.tasks.filter((t) => t.bucket === "Today" && !t.done);
+  const pendingTomorrow = context.tasks.filter((t) => t.bucket === "Tomorrow" && !t.done);
+  const pendingLater = context.tasks.filter((t) => t.bucket === "Later" && !t.done);
   const completedCount = context.tasks.filter((t) => t.done).length;
 
   const formatTask = (t: UserContext["tasks"][number]) =>
@@ -214,6 +210,7 @@ function buildSystemPrompt(context: UserContext): string {
 Use this information naturally in conversation when it's relevant. Don't recite it robotically — weave it in like a friend who already knows these things about you.
 
 Name: ${context.name} (call them ${firstName} in conversation)
+Current date and time (Malaysia): ${context.currentDate}, ${context.currentTime}
 Balance score: ${context.balanceScore}% — ${context.balanceLabel}
 This week: ${context.studyHours}hrs study, ${context.personalHours}hrs personal, ${context.restHours}hrs rest
 Petals: ${context.petalCount} collected, ${context.petalsToNextBloom} more to next bloom
@@ -227,7 +224,7 @@ Completed today: ${completedCount} task${completedCount !== 1 ? "s" : ""} done
 
 If i-Taleem is not connected and it comes up naturally, you can gently mention they can connect it under Settings then Integrations.
 If their balance score is low or rest is lacking, factor that into how you respond — don't push productivity at someone who needs rest.
-If they ask about their tasks, petals, or balance, you can answer directly from the data above.`;
+If they ask about their tasks, petals, balance, or the current time and date, answer directly from the data above.`;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -41,7 +41,6 @@ function toApiMessages(msgs: Msg[]) {
   }));
 }
 
-// Petals are fixed at 128, next bloom at 200 — matches rewards page
 const PETAL_COUNT = 128;
 const NEXT_BLOOM = 200;
 
@@ -64,7 +63,6 @@ function BuddyPage() {
   const [loading, setLoading] = useState(false);
   const initialized = useRef(false);
 
-  // Load from sessionStorage once on mount
   useEffect(() => {
     if (initialized.current) return;
     initialized.current = true;
@@ -79,7 +77,6 @@ function BuddyPage() {
     }
   }, []);
 
-  // Save to sessionStorage whenever messages change
   useEffect(() => {
     if (!initialized.current) return;
     try {
@@ -99,10 +96,26 @@ function BuddyPage() {
     setInput("");
     setLoading(true);
 
-    // Build fresh context snapshot at send time
+    const now = new Date();
+    const currentTime = now.toLocaleTimeString("en-MY", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: "Asia/Kuala_Lumpur",
+    });
+    const currentDate = now.toLocaleDateString("en-MY", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: "Asia/Kuala_Lumpur",
+    });
+
     const context = {
       name: session.name,
       email: session.email,
+      currentTime,
+      currentDate,
       petalCount: PETAL_COUNT,
       petalsToNextBloom: NEXT_BLOOM - PETAL_COUNT,
       balanceScore: score,

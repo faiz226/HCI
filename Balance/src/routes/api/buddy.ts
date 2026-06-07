@@ -15,6 +15,8 @@ const buddyInputSchema = z.object({
   context: z.object({
     name: z.string(),
     email: z.string(),
+    currentTime: z.string(),
+    currentDate: z.string(),
     petalCount: z.number(),
     petalsToNextBloom: z.number(),
     balanceScore: z.number(),
