@@ -1,4 +1,19 @@
 import { chatWithOpenRouter, OpenRouterError } from "./openrouter.server";
+import { Redis } from "@upstash/redis";
+
+let redis: Redis | null = null;
+
+function getRedis(): Redis | null {
+  try {
+    const url = process.env.KV_REST_API_URL?.trim();
+    const token = process.env.KV_REST_API_TOKEN?.trim();
+    if (!url || !token) return null;
+    if (!redis) redis = new Redis({ url, token });
+    return redis;
+  } catch {
+    return null;
+  }
+}
 
 const BUDDY_SYSTEM = `You are Buddy — the gentle AI companion inside Soft Oasis, a student wellbeing app designed for IIUM (International Islamic University Malaysia) students, particularly those in KICT (Kulliyyah of Information and Communication Technology).
 
@@ -172,15 +187,47 @@ function buddyNoticeFromError(error: unknown): BuddyNotice {
   return "offline";
 }
 
+async function logConversation(
+  userMessage: string,
+  buddyReply: string,
+  notice: BuddyNotice | null,
+) {
+  const db = getRedis();
+  if (!db) return;
+
+  try {
+    const timestamp = new Date().toISOString();
+    const id = `chat:${Date.now()}`;
+    await db.set(id, JSON.stringify({
+      timestamp,
+      userMessage,
+      buddyReply,
+      notice,
+    }));
+    // Keep a sorted list of all chat IDs by timestamp
+    await db.zadd("chat:index", { score: Date.now(), member: id });
+    // Keep only last 1000 conversations to avoid storage limit
+    await db.zremrangebyrank("chat:index", 0, -1001);
+  } catch {
+    // Logging failure should never break the chat
+  }
+}
+
 export async function handleBuddyMessage(messages: BuddyChatMessage[]): Promise<BuddyChatResult> {
   try {
     const reply = await chatWithOpenRouter([
       { role: "system", content: BUDDY_SYSTEM },
       ...messages,
     ]);
+
+    const lastUserMsg = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+    void logConversation(lastUserMsg, reply, null);
+
     return { reply, notice: null };
   } catch (error) {
     const notice = buddyNoticeFromError(error);
+    const lastUserMsg = messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
+    void logConversation(lastUserMsg, FALLBACK_BY_NOTICE[notice], notice);
     return { reply: FALLBACK_BY_NOTICE[notice], notice };
   }
 }
