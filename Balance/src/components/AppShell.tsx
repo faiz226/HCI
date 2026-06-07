@@ -108,12 +108,21 @@ export function AppShell({
           </SheetTrigger>
           <SheetContent side="left" className="bg-background border-outline-variant">
             <SheetHeader>
-              <SheetTitle className="font-display text-2xl text-deep-forest">
-                Soft Oasis
-              </SheetTitle>
-              <SheetDescription className="text-on-surface-variant">
-                A gentle space for the journey.
-              </SheetDescription>
+              <div className="flex items-center gap-3">
+                <img
+                  src="/logo.png"
+                  alt="Soft Oasis"
+                  className="w-10 h-10 rounded-xl object-cover"
+                />
+                <div>
+                  <SheetTitle className="font-display text-2xl text-deep-forest">
+                    Soft Oasis
+                  </SheetTitle>
+                  <SheetDescription className="text-on-surface-variant">
+                    A gentle space for the journey.
+                  </SheetDescription>
+                </div>
+              </div>
             </SheetHeader>
             <nav className="flex flex-col gap-1 mt-6 px-2">
               {NAV.map((n) => (
@@ -149,61 +158,69 @@ export function AppShell({
           </SheetContent>
         </Sheet>
 
-        <h1 className="font-display text-xl font-semibold text-primary">{title}</h1>
+        {/* Header center — logo + page title */}
+        <div className="flex items-center gap-2">
+          <img
+            src="/logo.png"
+            alt="Soft Oasis"
+            className="w-7 h-7 rounded-lg object-cover"
+          />
+          <h1 className="font-display text-xl font-semibold text-primary">{title}</h1>
+        </div>
 
         <div className="flex items-center gap-1">
           <ToggleTheme className="h-9 w-9 border-0 bg-transparent hover:bg-surface-container" />
           <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              aria-label="Account"
-              className="text-primary p-2 -mr-2 rounded-full transition hover:bg-surface-container active:scale-90"
-            >
-              <span className="material-symbols-outlined">account_circle</span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col">
-                <span className="text-sm font-medium text-on-surface">
-                  {session.signedIn ? session.name : "Guest"}
-                </span>
-                <span className="text-xs text-on-surface-variant">
-                  {session.signedIn ? session.email : "Not signed in"}
-                </span>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
-              <span className="material-symbols-outlined mr-2 text-[18px]">person</span>
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigate({ to: "/settings", search: { tab: "preferences" } })}
-            >
-              <span className="material-symbols-outlined mr-2 text-[18px]">tune</span>
-              Preferences
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            {session.signedIn ? (
-              <DropdownMenuItem onClick={() => setSignOutOpen(true)}>
-                <span className="material-symbols-outlined mr-2 text-[18px]">logout</span>
-                Sign out
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem
-                onClick={() => {
-                  sessionStore.signIn();
-                  toast("Welcome back");
-                  navigate({ to: "/profile" });
-                }}
+            <DropdownMenuTrigger asChild>
+              <button
+                aria-label="Account"
+                className="text-primary p-2 -mr-2 rounded-full transition hover:bg-surface-container active:scale-90"
               >
-                <span className="material-symbols-outlined mr-2 text-[18px]">login</span>
-                Sign in
+                <span className="material-symbols-outlined">account_circle</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium text-on-surface">
+                    {session.signedIn ? session.name : "Guest"}
+                  </span>
+                  <span className="text-xs text-on-surface-variant">
+                    {session.signedIn ? session.email : "Not signed in"}
+                  </span>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => navigate({ to: "/profile" })}>
+                <span className="material-symbols-outlined mr-2 text-[18px]">person</span>
+                Profile
               </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem
+                onClick={() => navigate({ to: "/settings", search: { tab: "preferences" } })}
+              >
+                <span className="material-symbols-outlined mr-2 text-[18px]">tune</span>
+                Preferences
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {session.signedIn ? (
+                <DropdownMenuItem onClick={() => setSignOutOpen(true)}>
+                  <span className="material-symbols-outlined mr-2 text-[18px]">logout</span>
+                  Sign out
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  onClick={() => {
+                    sessionStore.signIn();
+                    toast("Welcome back");
+                    navigate({ to: "/profile" });
+                  }}
+                >
+                  <span className="material-symbols-outlined mr-2 text-[18px]">login</span>
+                  Sign in
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
