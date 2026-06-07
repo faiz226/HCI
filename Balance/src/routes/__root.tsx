@@ -77,7 +77,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
-      { title: "Soft Oasis — Student Wellbeing" },
+      { title: "Soft Oasis - Student Wellbeing" },
       { name: "description", content: "A calm companion for academic balance, focus, and rest." },
       { name: "theme-color", content: "#fcf9f3" },
       { property: "og:title", content: "Soft Oasis" },
