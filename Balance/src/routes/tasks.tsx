@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { format, isToday, isTomorrow } from "date-fns";
+import { format, isToday, isTomorrow, differenceInCalendarDays } from "date-fns";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -31,6 +31,7 @@ import {
   useTasks,
   type Bucket,
   type Category,
+  type Task,
 } from "@/lib/tasks-store";
 import { fireConfetti } from "@/lib/confetti";
 import { toast } from "sonner";
@@ -48,6 +49,8 @@ export const Route = createFileRoute("/tasks")({
 const FILTERS: Array<"All" | Category> = ["All", "Kuliyyah", "Personal"];
 const BUCKETS: Bucket[] = ["Today", "Tomorrow", "Later"];
 
+// ─── Date / time helpers ──────────────────────────────────────────────────────
+
 function formatTimeLabel(value: string) {
   const [hoursRaw, minutes] = value.split(":");
   const hours24 = Number(hoursRaw);
@@ -58,10 +61,26 @@ function formatTimeLabel(value: string) {
 
 function formatWhenLabel(date?: Date, time?: string) {
   if (!date && !time) return "Anytime";
-  const dateLabel = date ? format(date, "EEEE, MMM d") : "";
+
   const timeLabel = time ? formatTimeLabel(time) : "";
-  if (dateLabel && timeLabel) return `${dateLabel} at ${timeLabel}`;
-  return dateLabel || timeLabel;
+
+  if (!date) return timeLabel || "Anytime";
+
+  const daysFromNow = differenceInCalendarDays(date, new Date());
+
+  // Within 7 days — show day name + time only
+  if (daysFromNow >= 0 && daysFromNow <= 6) {
+    const dayLabel = isToday(date)
+      ? "Today"
+      : isTomorrow(date)
+        ? "Tomorrow"
+        : format(date, "EEEE"); // e.g. "Wednesday"
+    return timeLabel ? `${dayLabel} at ${timeLabel}` : dayLabel;
+  }
+
+  // Beyond 7 days — show full date + day + time
+  const dateLabel = format(date, "EEE, MMM d"); // e.g. "Wed, Jul 16"
+  return timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
 }
 
 function bucketFromDate(date?: Date): Bucket {
@@ -81,12 +100,15 @@ function completeTask(id: string, wasDone: boolean) {
   }
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 function TasksPage() {
   const tasks = useTasks();
   const [filter, setFilter] = useState<"All" | Category>("All");
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
 
   const filtered = useMemo(
     () =>
@@ -171,7 +193,7 @@ function TasksPage() {
                           aria-label={t.done ? "Mark not done" : "Mark done"}
                           onClick={() => completeTask(t.id, t.done)}
                           className={
-                            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition " +
+                            "w-6 h-6 rounded-full border-2 flex items-center justify-center transition shrink-0 " +
                             (tone === "sage" ? "border-sage" : "border-clay") +
                             (t.done ? (tone === "sage" ? " bg-sage" : " bg-clay") : "")
                           }
@@ -199,7 +221,7 @@ function TasksPage() {
                           <DropdownMenuTrigger asChild>
                             <button
                               aria-label="More"
-                              className="text-on-surface-variant p-1 rounded-full hover:bg-surface-container"
+                              className="text-on-surface-variant p-1 rounded-full hover:bg-surface-container shrink-0"
                             >
                               <span className="material-symbols-outlined">more_vert</span>
                             </button>
@@ -210,6 +232,12 @@ function TasksPage() {
                                 {t.done ? "undo" : "check"}
                               </span>
                               {t.done ? "Mark as open" : "Mark as done"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditTask(t)}>
+                              <span className="material-symbols-outlined mr-2 text-[18px]">
+                                edit
+                              </span>
+                              Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
                               onClick={() => {
@@ -246,9 +274,15 @@ function TasksPage() {
       </button>
 
       <AddTaskDialog open={addOpen} onOpenChange={setAddOpen} />
+      <EditTaskDialog
+        task={editTask}
+        onClose={() => setEditTask(null)}
+      />
     </AppShell>
   );
 }
+
+// ─── Add dialog ───────────────────────────────────────────────────────────────
 
 function AddTaskDialog({
   open,
@@ -368,6 +402,137 @@ function AddTaskDialog({
               className="px-5 py-2 rounded-full bg-primary text-on-primary text-sm font-medium hover:opacity-90"
             >
               Add
+            </button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit dialog ──────────────────────────────────────────────────────────────
+
+function EditTaskDialog({
+  task,
+  onClose,
+}: {
+  task: Task | null;
+  onClose: () => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [date, setDate] = useState<Date>();
+  const [time, setTime] = useState<string>();
+  const [category, setCategory] = useState<Category>("Kuliyyah");
+  const [bucket, setBucket] = useState<Bucket>("Today");
+
+  // Populate fields when a task is passed in
+  useEffect(() => {
+    if (!task) return;
+    setTitle(task.title);
+    setCategory(task.category);
+    setBucket(task.bucket);
+    setDate(undefined);
+    setTime(undefined);
+  }, [task]);
+
+  useEffect(() => {
+    if (date) setBucket(bucketFromDate(date));
+  }, [date]);
+
+  const submit = () => {
+    if (!title.trim() || !task) return;
+    const when = formatWhenLabel(date, time) !== "Anytime"
+      ? formatWhenLabel(date, time)
+      : task.when; // keep original when label if user didn't pick a new date/time
+    const resolvedBucket = date ? bucketFromDate(date) : bucket;
+    tasksStore.update(task.id, {
+      title: title.trim(),
+      when,
+      category,
+      bucket: resolvedBucket,
+    });
+    toast("Task updated", { description: title.trim() });
+    onClose();
+  };
+
+  return (
+    <Dialog open={Boolean(task)} onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="bg-surface-white">
+        <DialogHeader>
+          <DialogTitle className="font-display text-2xl text-deep-forest">Edit task</DialogTitle>
+        </DialogHeader>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            submit();
+          }}
+          className="flex flex-col gap-4"
+        >
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="e-title">Title</Label>
+            <Input
+              id="e-title"
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="What's on your mind?"
+              className="bg-surface-white"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-2">
+              <Label>Date</Label>
+              <DatePicker date={date} onDateChange={setDate} placeholder="Keep current" />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Time</Label>
+              <TimePicker value={time} onValueChange={setTime} placeholder="Keep current" />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-2">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
+                <SelectTrigger className="bg-surface-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Kuliyyah">Kuliyyah</SelectItem>
+                  <SelectItem value="Personal">Personal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label>Bucket</Label>
+              <Select
+                value={bucket}
+                onValueChange={(v) => setBucket(v as Bucket)}
+                disabled={Boolean(date)}
+              >
+                <SelectTrigger className="bg-surface-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Today">Today</SelectItem>
+                  <SelectItem value="Tomorrow">Tomorrow</SelectItem>
+                  <SelectItem value="Later">Later</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-full text-sm text-on-surface-variant hover:bg-surface-container"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-5 py-2 rounded-full bg-primary text-on-primary text-sm font-medium hover:opacity-90"
+            >
+              Save
             </button>
           </DialogFooter>
         </form>

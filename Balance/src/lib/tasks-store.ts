@@ -38,6 +38,10 @@ export const tasksStore = {
     tasks = [...tasks, { ...task, id: String(Date.now()), done: false }];
     emit();
   },
+  update(id: string, changes: Partial<Omit<Task, "id" | "done">>) {
+    tasks = tasks.map((t) => (t.id === id ? { ...t, ...changes } : t));
+    emit();
+  },
   remove(id: string) {
     tasks = tasks.filter((t) => t.id !== id);
     emit();
