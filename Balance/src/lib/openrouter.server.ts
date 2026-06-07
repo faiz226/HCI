@@ -4,6 +4,7 @@ const CEREBRAS_URL = "https://api.cerebras.ai/v1/chat/completions";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 const MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions";
+const HUGGINGFACE_URL = "https://router.huggingface.co/novita/v3/openai/chat/completions";
 
 export type OpenRouterChatMessage = {
   role: "system" | "user" | "assistant";
@@ -183,6 +184,42 @@ async function callMistral(messages: OpenRouterChatMessage[]): Promise<string> {
   return text;
 }
 
+// ─── HuggingFace ─────────────────────────────────────────────────────────────
+async function callHuggingFace(messages: OpenRouterChatMessage[]): Promise<string> {
+  const apiKey = process.env.HUGGINGFACE_API_KEY?.trim();
+  if (!apiKey) throw new OpenRouterError("HUGGINGFACE_API_KEY not configured", "config");
+
+  const response = await fetch(HUGGINGFACE_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "mistralai/mistral-7b-instruct",
+      messages,
+      max_tokens: 768,
+      temperature: 0.65,
+    }),
+  });
+
+  if (!response.ok) {
+    const status = response.status;
+    if (status === 429) throw new OpenRouterError("HuggingFace rate limit", "rate_limit", { status, retryable: true });
+    if (status === 401 || status === 403) throw new OpenRouterError("HuggingFace auth failed", "config", { status });
+    throw new OpenRouterError(`HuggingFace error ${status}`, "api", { status, retryable: true });
+  }
+
+  const data = (await response.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const text = data.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new OpenRouterError("HuggingFace returned empty reply", "api", { retryable: true });
+
+  return text;
+}
+
 // ─── Failover chain ──────────────────────────────────────────────────────────
 export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Promise<string> {
   const providers = [
@@ -190,6 +227,7 @@ export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Pro
     { name: "Groq", fn: callGroq },
     { name: "Gemini", fn: callGemini },
     { name: "Mistral", fn: callMistral },
+    { name: "HuggingFace", fn: callHuggingFace },
   ];
 
   let lastError: OpenRouterError | undefined;
@@ -205,14 +243,12 @@ export async function chatWithOpenRouter(messages: OpenRouterChatMessage[]): Pro
 
       lastError = normalized;
 
-      // Don't try next provider if it's a config error for this provider
-      // But DO try next if it's rate limited or API error
       if (normalized.reason === "config") {
-        continue; // key not set, skip to next provider
+        continue;
       }
       if (normalized.reason === "rate_limit" || normalized.reason === "api") {
         await sleep(300);
-        continue; // try next provider
+        continue;
       }
     }
   }
