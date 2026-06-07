@@ -249,15 +249,35 @@ export async function handleBuddyMessage(
     messages.filter((m) => m.role === "user").at(-1)?.content ?? "";
 
   try {
-    const reply = await chatWithOpenRouter([
-      { role: "system", content: buildSystemPrompt(context) },
-      ...messages,
-    ]);
+    let reply: string | null = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        reply = await chatWithOpenRouter([
+          { role: "system", content: buildSystemPrompt(context) },
+          ...messages,
+        ]);
+        break;
+      } catch (err) {
+        attempts++;
+        if (
+          err instanceof OpenRouterError &&
+          err.reason === "rate_limit" &&
+          attempts < maxAttempts
+        ) {
+          await new Promise((res) => setTimeout(res, attempts * 1500));
+          continue;
+        }
+        throw err;
+      }
+    }
 
     console.log(`[Chat] USER: ${lastUserMsg}`);
     console.log(`[Chat] BUDDY: ${reply}`);
 
-    return { reply, notice: null };
+    return { reply: reply!, notice: null };
   } catch (error) {
     const notice = buddyNoticeFromError(error);
 
