@@ -13,6 +13,7 @@ import {
 import { useTasks, tasksStore } from "@/lib/tasks-store";
 import { useSession } from "@/lib/session-store";
 import { useSettings } from "@/lib/settings-store";
+import { useBalance, computeBalanceScore } from "@/lib/balance-store";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/")({
@@ -53,6 +54,8 @@ function HomePage() {
   const tasks = useTasks();
   const session = useSession();
   const settings = useSettings();
+  const balance = useBalance();
+  const { score: balanceScore, label: balanceLabel } = computeBalanceScore(balance);
   const italeemTipRef = useRef<HTMLElement>(null);
   const [showItaleemTip, setShowItaleemTip] = useState(false);
   const today = tasks.filter((t) => t.bucket === "Today").slice(0, 3);
@@ -123,8 +126,7 @@ function HomePage() {
             take it gently today.
           </h2>
           <p className="text-base text-on-surface-variant leading-relaxed max-w-prose">
-            You're 68% balanced this week. One focused study block and a walk would round out
-            your day.
+            You're {balanceScore}% balanced this week — {balanceLabel.toLowerCase()}.
           </p>
         </section>
 
@@ -177,7 +179,7 @@ function HomePage() {
           >
             <span className="material-symbols-outlined text-sage">spa</span>
             <span className="text-xs uppercase tracking-wider text-on-surface-variant">Balance</span>
-            <span className="font-display text-2xl text-deep-forest">68%</span>
+            <span className="font-display text-2xl text-deep-forest">{balanceScore}%</span>
           </Link>
           <Link
             to="/tasks"
