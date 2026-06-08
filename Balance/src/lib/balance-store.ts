@@ -37,18 +37,34 @@ function persist() {
 
 export function computeBalanceScore(hours: BalanceHours) {
   const total = hours.study + hours.personal + hours.rest;
-  if (total <= 0) return { score: 0, label: "Set your week" };
+  if (total <= 0) return { score: 0, label: "Set your week", studyPct: 0, personalPct: 0, restPct: 0 };
 
   const studyPct = (hours.study / total) * 100;
   const personalPct = (hours.personal / total) * 100;
   const restPct = (hours.rest / total) * 100;
+
+  // Check absolute minimum hours in each category
+  const hasMinStudy = hours.study >= 5;
+  const hasMinPersonal = hours.personal >= 3;
+  const hasMinRest = hours.rest >= 40;
+
+  // Penalty if missing minimum hours in any category
+  const minimumPenalty =
+    (!hasMinStudy ? 20 : 0) +
+    (!hasMinPersonal ? 15 : 0) +
+    (!hasMinRest ? 25 : 0);
+
   const ideal = { study: 20, personal: 15, rest: 65 };
   const deviation =
     (Math.abs(studyPct - ideal.study) +
       Math.abs(personalPct - ideal.personal) +
       Math.abs(restPct - ideal.rest)) /
     3;
-  const score = Math.round(Math.max(0, Math.min(100, 100 - deviation * 2.2)));
+
+  const score = Math.round(
+    Math.max(0, Math.min(100, 100 - deviation * 1.5 - minimumPenalty))
+  );
+
   const label = score >= 75 ? "Balanced" : score >= 50 ? "Finding rhythm" : "Needs rest";
   return { score, label, studyPct, personalPct, restPct };
 }
