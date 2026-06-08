@@ -207,7 +207,7 @@ function TasksPage() {
                         <div className="flex flex-col flex-1 min-w-0">
                           <span
                             className={
-                              "font-display text-lg text-on-surface truncate " +
+                              "font-display text-lg text-on-surface break-words " +
                               (t.done ? "line-through opacity-60" : "")
                             }
                           >
