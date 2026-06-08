@@ -43,12 +43,10 @@ export function computeBalanceScore(hours: BalanceHours) {
   const personalPct = (hours.personal / total) * 100;
   const restPct = (hours.rest / total) * 100;
 
-  // Check absolute minimum hours in each category
   const hasMinStudy = hours.study >= 5;
   const hasMinPersonal = hours.personal >= 3;
   const hasMinRest = hours.rest >= 40;
 
-  // Penalty if missing minimum hours in any category
   const minimumPenalty =
     (!hasMinStudy ? 20 : 0) +
     (!hasMinPersonal ? 15 : 0) +
@@ -65,17 +63,53 @@ export function computeBalanceScore(hours: BalanceHours) {
     Math.max(0, Math.min(100, 100 - deviation * 1.5 - minimumPenalty))
   );
 
-  const label = score >= 75 ? "Balanced" : score >= 50 ? "Finding rhythm" : "Needs rest";
+  // Smart label based on what's actually missing
+  let label: string;
+  if (total <= 0) {
+    label = "Set your week";
+  } else if (!hasMinStudy && !hasMinPersonal) {
+    label = "Add study & social time";
+  } else if (!hasMinStudy) {
+    label = "Add some study time";
+  } else if (!hasMinPersonal) {
+    label = "Add some social time";
+  } else if (!hasMinRest) {
+    label = "Needs more rest";
+  } else if (score >= 75) {
+    label = "Balanced";
+  } else if (score >= 50) {
+    label = "Finding rhythm";
+  } else {
+    label = "Almost there";
+  }
+
   return { score, label, studyPct, personalPct, restPct };
 }
 
 export function balanceInsight(hours: BalanceHours) {
-  const { score, studyPct, restPct } = computeBalanceScore(hours);
+  const { score, restPct } = computeBalanceScore(hours);
+
+  const hasMinStudy = hours.study >= 5;
+  const hasMinPersonal = hours.personal >= 3;
+  const hasMinRest = hours.rest >= 40;
+
+  if (!hasMinStudy && !hasMinPersonal) {
+    return "You have plenty of rest — now try adding some study and personal time to round out your week.";
+  }
+  if (!hasMinStudy) {
+    return "Rest looks good! Try logging at least 5 hours of study time to balance things out.";
+  }
+  if (!hasMinPersonal) {
+    return "Good on study and rest — don't forget to make time for yourself and the people around you.";
+  }
+  if (!hasMinRest) {
+    return "Rest is running low — even short pauses can restore focus.";
+  }
   if (hours.study >= 20) {
     return `You've logged ${hours.study.toFixed(1)} hours of study this week. Time for a break.`;
   }
   if (restPct < 55) {
-    return "Rest is running low — even short pauses can restore focus.";
+    return "Rest is running a little low — try shifting some time toward sleep and recovery.";
   }
   if (score >= 75) {
     return "Your week looks steady. Keep listening to what your body needs.";
