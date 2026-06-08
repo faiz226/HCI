@@ -32,6 +32,7 @@ import { toast } from "sonner";
 import { sessionStore, useSession } from "@/lib/session-store";
 import { showItaleemConnectReminder } from "@/lib/italeem";
 import { useSettings } from "@/lib/settings-store";
+import { useTaskReminders } from "@/lib/task-reminders";
 
 type NavItem = {
   to: "/" | "/tasks" | "/buddy" | "/balance" | "/rewards";
@@ -77,6 +78,8 @@ export function AppShell({
   const settings = useSettings();
   const [menuOpen, setMenuOpen] = useState(false);
   const [signOutOpen, setSignOutOpen] = useState(false);
+
+  useTaskReminders();
 
   useEffect(() => {
     if (!session.signedIn || settings.italeemConnected) return;
@@ -158,7 +161,6 @@ export function AppShell({
           </SheetContent>
         </Sheet>
 
-        {/* Header center — logo + page title */}
         <div className="flex items-center gap-2">
           <img
             src="/logo.png"

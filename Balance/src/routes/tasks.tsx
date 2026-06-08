@@ -31,6 +31,7 @@ import {
   useTasks,
   type Bucket,
   type Category,
+  type ReminderOption,
   type Task,
 } from "@/lib/tasks-store";
 import { fireConfetti } from "@/lib/confetti";
@@ -68,18 +69,16 @@ function formatWhenLabel(date?: Date, time?: string) {
 
   const daysFromNow = differenceInCalendarDays(date, new Date());
 
-  // Within 7 days — show day name + time only
   if (daysFromNow >= 0 && daysFromNow <= 6) {
     const dayLabel = isToday(date)
       ? "Today"
       : isTomorrow(date)
         ? "Tomorrow"
-        : format(date, "EEEE"); // e.g. "Wednesday"
+        : format(date, "EEEE");
     return timeLabel ? `${dayLabel} at ${timeLabel}` : dayLabel;
   }
 
-  // Beyond 7 days — show full date + day + time
-  const dateLabel = format(date, "EEE, MMM d"); // e.g. "Wed, Jul 16"
+  const dateLabel = format(date, "EEE, MMM d");
   return timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
 }
 
@@ -213,8 +212,13 @@ function TasksPage() {
                           >
                             {t.title}
                           </span>
-                          <span className="text-xs text-on-surface-variant">
+                          <span className="text-xs text-on-surface-variant flex items-center gap-1">
                             {t.category} · {t.when}
+                            {t.reminder !== "none" && (
+                              <span className="material-symbols-outlined text-[13px] text-primary">
+                                notifications
+                              </span>
+                            )}
                           </span>
                         </div>
                         <DropdownMenu>
@@ -274,10 +278,7 @@ function TasksPage() {
       </button>
 
       <AddTaskDialog open={addOpen} onOpenChange={setAddOpen} />
-      <EditTaskDialog
-        task={editTask}
-        onClose={() => setEditTask(null)}
-      />
+      <EditTaskDialog task={editTask} onClose={() => setEditTask(null)} />
     </AppShell>
   );
 }
@@ -296,6 +297,7 @@ function AddTaskDialog({
   const [time, setTime] = useState<string>();
   const [category, setCategory] = useState<Category>("Kuliyyah");
   const [bucket, setBucket] = useState<Bucket>("Today");
+  const [reminder, setReminder] = useState<ReminderOption>("none");
 
   useEffect(() => {
     if (date) setBucket(bucketFromDate(date));
@@ -307,6 +309,7 @@ function AddTaskDialog({
     setTime(undefined);
     setCategory("Kuliyyah");
     setBucket("Today");
+    setReminder("none");
   };
 
   const submit = () => {
@@ -318,6 +321,7 @@ function AddTaskDialog({
       when,
       category,
       bucket: resolvedBucket,
+      reminder,
     });
     toast("Task added", { description: when });
     reset();
@@ -389,6 +393,22 @@ function AddTaskDialog({
               </Select>
             </div>
           </div>
+          <div className="flex flex-col gap-2">
+            <Label>Alert</Label>
+            <Select value={reminder} onValueChange={(v) => setReminder(v as ReminderOption)}>
+              <SelectTrigger className="bg-surface-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="at_time">At time of task</SelectItem>
+                <SelectItem value="5min">5 minutes before</SelectItem>
+                <SelectItem value="15min">15 minutes before</SelectItem>
+                <SelectItem value="30min">30 minutes before</SelectItem>
+                <SelectItem value="1hr">1 hour before</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter>
             <button
               type="button"
@@ -424,13 +444,14 @@ function EditTaskDialog({
   const [time, setTime] = useState<string>();
   const [category, setCategory] = useState<Category>("Kuliyyah");
   const [bucket, setBucket] = useState<Bucket>("Today");
+  const [reminder, setReminder] = useState<ReminderOption>("none");
 
-  // Populate fields when a task is passed in
   useEffect(() => {
     if (!task) return;
     setTitle(task.title);
     setCategory(task.category);
     setBucket(task.bucket);
+    setReminder(task.reminder ?? "none");
     setDate(undefined);
     setTime(undefined);
   }, [task]);
@@ -441,15 +462,15 @@ function EditTaskDialog({
 
   const submit = () => {
     if (!title.trim() || !task) return;
-    const when = formatWhenLabel(date, time) !== "Anytime"
-      ? formatWhenLabel(date, time)
-      : task.when; // keep original when label if user didn't pick a new date/time
+    const newWhen = formatWhenLabel(date, time);
+    const when = newWhen !== "Anytime" ? newWhen : task.when;
     const resolvedBucket = date ? bucketFromDate(date) : bucket;
     tasksStore.update(task.id, {
       title: title.trim(),
       when,
       category,
       bucket: resolvedBucket,
+      reminder,
     });
     toast("Task updated", { description: title.trim() });
     onClose();
@@ -519,6 +540,22 @@ function EditTaskDialog({
                 </SelectContent>
               </Select>
             </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label>Alert</Label>
+            <Select value={reminder} onValueChange={(v) => setReminder(v as ReminderOption)}>
+              <SelectTrigger className="bg-surface-white">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">None</SelectItem>
+                <SelectItem value="at_time">At time of task</SelectItem>
+                <SelectItem value="5min">5 minutes before</SelectItem>
+                <SelectItem value="15min">15 minutes before</SelectItem>
+                <SelectItem value="30min">30 minutes before</SelectItem>
+                <SelectItem value="1hr">1 hour before</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <DialogFooter>
             <button

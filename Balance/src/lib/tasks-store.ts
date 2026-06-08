@@ -2,6 +2,7 @@ import { useSyncExternalStore } from "react";
 
 export type Category = "Kuliyyah" | "Personal";
 export type Bucket = "Today" | "Tomorrow" | "Later";
+export type ReminderOption = "none" | "at_time" | "5min" | "15min" | "30min" | "1hr";
 
 export type Task = {
   id: string;
@@ -10,15 +11,16 @@ export type Task = {
   when: string;
   bucket: Bucket;
   done: boolean;
+  reminder: ReminderOption;
 };
 
 const STORAGE_KEY = "soft-oasis-tasks";
 
 const defaultTasks: Task[] = [
-  { id: "1", title: "Read Islamic Ethics Ch. 4", category: "Kuliyyah", when: "2:00 PM", bucket: "Today", done: false },
-  { id: "2", title: "Call Mom", category: "Personal", when: "5:30 PM", bucket: "Today", done: false },
-  { id: "3", title: "Draft FYP Proposal", category: "Kuliyyah", when: "11:59 PM", bucket: "Tomorrow", done: false },
-  { id: "4", title: "Renew Library Books", category: "Kuliyyah", when: "Friday", bucket: "Later", done: false },
+  { id: "1", title: "Read Islamic Ethics Ch. 4", category: "Kuliyyah", when: "2:00 PM", bucket: "Today", done: false, reminder: "none" },
+  { id: "2", title: "Call Mom", category: "Personal", when: "5:30 PM", bucket: "Today", done: false, reminder: "none" },
+  { id: "3", title: "Draft FYP Proposal", category: "Kuliyyah", when: "11:59 PM", bucket: "Tomorrow", done: false, reminder: "none" },
+  { id: "4", title: "Renew Library Books", category: "Kuliyyah", when: "Friday", bucket: "Later", done: false, reminder: "none" },
 ];
 
 function readTasks(): Task[] {
@@ -26,7 +28,9 @@ function readTasks(): Task[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultTasks;
-    return JSON.parse(raw) as Task[];
+    const parsed = JSON.parse(raw) as Task[];
+    // backfill reminder field for old tasks that don't have it
+    return parsed.map((t) => ({ reminder: "none", ...t }));
   } catch {
     return defaultTasks;
   }
