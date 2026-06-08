@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/AppShell";
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { useTasks } from "@/lib/tasks-store";
 
 export const Route = createFileRoute("/rewards")({
   head: () => ({
@@ -29,15 +30,164 @@ const BADGES = [
   { icon: "favorite", name: "Kindness", earned: false, desc: "A note to a friend", detail: "Write a kind note to someone. It doesn't have to be long." },
 ];
 
+// ─── Streak helpers ───────────────────────────────────────────────────────────
+
+const STREAK_KEY = "soft-oasis-streak";
+
+type StreakData = {
+  current: number;
+  longest: number;
+  lastActiveDate: string; // "YYYY-MM-DD"
+};
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+function readStreak(): StreakData {
+  try {
+    const raw = localStorage.getItem(STREAK_KEY);
+    if (!raw) return { current: 0, longest: 0, lastActiveDate: "" };
+    return JSON.parse(raw) as StreakData;
+  } catch {
+    return { current: 0, longest: 0, lastActiveDate: "" };
+  }
+}
+
+function saveStreak(data: StreakData) {
+  localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+}
+
+function computeStreak(hasCompletedTaskToday: boolean): StreakData {
+  const data = readStreak();
+  const today = todayStr();
+  const yesterday = yesterdayStr();
+
+  if (!hasCompletedTaskToday) {
+    // If last active was yesterday, streak is still alive (just not updated yet today)
+    if (data.lastActiveDate === yesterday || data.lastActiveDate === today) {
+      return data;
+    }
+    // Streak broken
+    return { ...data, current: 0 };
+  }
+
+  // Has completed a task today
+  if (data.lastActiveDate === today) {
+    // Already counted today
+    return data;
+  }
+
+  if (data.lastActiveDate === yesterday) {
+    // Continue streak
+    const next = { current: data.current + 1, longest: Math.max(data.longest, data.current + 1), lastActiveDate: today };
+    saveStreak(next);
+    return next;
+  }
+
+  // First task ever or streak was broken
+  const next = { current: 1, longest: Math.max(data.longest, 1), lastActiveDate: today };
+  saveStreak(next);
+  return next;
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 function RewardsPage() {
+  const tasks = useTasks();
   const [selected, setSelected] = useState<(typeof BADGES)[number] | null>(null);
+  const [streak, setStreak] = useState<StreakData>({ current: 0, longest: 0, lastActiveDate: "" });
+
   const petals = 128;
   const nextBloom = 200;
   const progress = Math.round((petals / nextBloom) * 100);
 
+  const hasCompletedTaskToday = tasks.some(
+    (t) => t.done && t.bucket === "Today"
+  );
+
+  useEffect(() => {
+    const computed = computeStreak(hasCompletedTaskToday);
+    setStreak(computed);
+  }, [hasCompletedTaskToday]);
+
+  const streakEmoji =
+    streak.current >= 7 ? "🔥" :
+    streak.current >= 3 ? "✨" :
+    streak.current >= 1 ? "🌱" : "💤";
+
   return (
     <AppShell title="Rewards">
       <div className="flex flex-col gap-8">
+
+        {/* ── Streak card ── */}
+        <section className="bg-surface-white rounded-xl p-5 border border-dusty-olive/20 shadow-soft flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-on-surface-variant">
+                Daily streak
+              </p>
+              <p className="font-display text-3xl text-deep-forest mt-1 flex items-center gap-2">
+                {streak.current}
+                <span className="text-2xl">{streakEmoji}</span>
+              </p>
+              <p className="text-xs text-on-surface-variant mt-1">
+                {streak.current === 0
+                  ? "Complete a task today to start your streak."
+                  : streak.current === 1
+                  ? "You started — keep it going tomorrow."
+                  : `${streak.current} days in a row. Longest: ${streak.longest}.`}
+              </p>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              {[...Array(7)].map((_, i) => (
+                <div key={i} className="flex gap-1">
+                  {i === 0 && [...Array(7)].map((_, j) => (
+                    <div
+                      key={j}
+                      className={
+                        "w-6 h-6 rounded-full " +
+                        (j < streak.current % 7 || (streak.current >= 7 && j < 7)
+                          ? "bg-primary"
+                          : "bg-surface-container border border-outline-variant")
+                      }
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* 7-dot streak row */}
+          <div className="flex gap-2 justify-center">
+            {[...Array(7)].map((_, i) => {
+              const filled = i < Math.min(streak.current, 7);
+              return (
+                <div
+                  key={i}
+                  className={
+                    "w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium transition " +
+                    (filled
+                      ? "bg-primary text-on-primary"
+                      : "bg-surface-container border border-outline-variant text-on-surface-variant")
+                  }
+                >
+                  {filled ? "✓" : i + 1}
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-on-surface-variant text-center">
+            Complete at least one task each day to keep your streak alive.
+          </p>
+        </section>
+
+        {/* ── Petals card ── */}
         <section className="bg-surface-white rounded-xl p-5 border border-dusty-olive/20 shadow-soft flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
@@ -58,6 +208,7 @@ function RewardsPage() {
           </p>
         </section>
 
+        {/* ── Badges ── */}
         <section className="flex flex-col gap-3">
           <h2 className="font-display text-2xl text-deep-forest">Your Garden</h2>
           <div className="grid grid-cols-3 gap-3">
