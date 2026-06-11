@@ -32,6 +32,16 @@ export default function OnboardingScreen() {
   const isLast = step === STEPS.length - 1;
   const { Icon, title, body } = STEPS[step];
 
+  function goToLogin() {
+    localStorage.setItem("soft-oasis-onboarded", "1");
+    navigate({ to: "/login" });
+  }
+
+  function goToRegister() {
+    localStorage.setItem("soft-oasis-onboarded", "1");
+    navigate({ to: "/register" });
+  }
+
   function advance() {
     if (exiting) return;
     if (!isLast) {
@@ -41,8 +51,7 @@ export default function OnboardingScreen() {
         setExiting(false);
       }, 220);
     } else {
-      localStorage.setItem("soft-oasis-onboarded", "1");
-      navigate({ to: "/login" });
+      goToLogin();
     }
   }
 
@@ -59,10 +68,7 @@ export default function OnboardingScreen() {
       {/* Skip */}
       <div style={{ display: "flex", justifyContent: "flex-end", padding: "1.25rem 1.5rem 0" }}>
         <button
-          onClick={() => {
-            localStorage.setItem("soft-oasis-onboarded", "1");
-            navigate({ to: "/login" });
-          }}
+          onClick={goToLogin}
           style={{
             background: "none",
             border: "none",
@@ -70,6 +76,7 @@ export default function OnboardingScreen() {
             color: "var(--muted-foreground)",
             cursor: "pointer",
             padding: "0.25rem 0.5rem",
+            fontFamily: "inherit",
           }}
         >
           skip
@@ -91,18 +98,7 @@ export default function OnboardingScreen() {
           transform: exiting ? "translateX(-16px)" : "translateX(0)",
         }}
       >
-        {/* Icon blob */}
-        <div
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: "50%",
-            background: "var(--primary)",
-            opacity: 0.1,
-            position: "absolute",
-            pointerEvents: "none",
-          }}
-        />
+        {/* Icon circle */}
         <div
           style={{
             width: 96,
@@ -157,49 +153,83 @@ export default function OnboardingScreen() {
         style={{
           padding: "1.5rem 2rem 2.5rem",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          flexDirection: "column",
+          gap: "1rem",
         }}
       >
-        {/* Step dots */}
-        <div style={{ display: "flex", gap: 6 }}>
-          {STEPS.map((_, i) => (
-            <span
-              key={i}
-              style={{
-                width: i === step ? 20 : 6,
-                height: 6,
-                borderRadius: 99,
-                background: i === step ? "var(--primary)" : "var(--muted)",
-                transition: "width 0.25s ease, background 0.25s ease",
-                display: "block",
-              }}
-            />
-          ))}
+        {/* Dots + Next row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          {/* Step dots */}
+          <div style={{ display: "flex", gap: 6 }}>
+            {STEPS.map((_, i) => (
+              <span
+                key={i}
+                style={{
+                  width: i === step ? 20 : 6,
+                  height: 6,
+                  borderRadius: 99,
+                  background: i === step ? "var(--primary)" : "var(--muted)",
+                  transition: "width 0.25s ease, background 0.25s ease",
+                  display: "block",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Next / Get started button */}
+          <button
+            onClick={advance}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "0.4rem",
+              background: "var(--primary)",
+              color: "var(--primary-foreground)",
+              border: "none",
+              borderRadius: "99px",
+              padding: isLast ? "0.65rem 1.5rem" : "0.65rem 1rem",
+              fontSize: "0.9375rem",
+              fontWeight: 500,
+              cursor: "pointer",
+              transition: "padding 0.25s ease, opacity 0.15s ease",
+              fontFamily: "inherit",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
+            onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+          >
+            {isLast ? "Sign in" : <ArrowRight size={20} weight="bold" />}
+          </button>
         </div>
 
-        {/* Next / Get started button */}
-        <button
-          onClick={advance}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "0.4rem",
-            background: "var(--primary)",
-            color: "var(--primary-foreground)",
-            border: "none",
-            borderRadius: "99px",
-            padding: isLast ? "0.65rem 1.5rem" : "0.65rem 1rem",
-            fontSize: "0.9375rem",
-            fontWeight: 500,
-            cursor: "pointer",
-            transition: "padding 0.25s ease, opacity 0.15s ease",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.88")}
-          onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-        >
-          {isLast ? "Get started" : <ArrowRight size={20} weight="bold" />}
-        </button>
+        {/* Register link — only shown on last step */}
+        {isLast && (
+          <p
+            style={{
+              fontSize: "0.8125rem",
+              color: "var(--muted-foreground)",
+              margin: 0,
+              textAlign: "center",
+              transition: "opacity 0.3s ease",
+            }}
+          >
+            New here?{" "}
+            <button
+              onClick={goToRegister}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "var(--primary)",
+                fontWeight: 500,
+                fontSize: "0.8125rem",
+                padding: 0,
+                fontFamily: "inherit",
+              }}
+            >
+              Create an account
+            </button>
+          </p>
+        )}
       </div>
     </div>
   );
