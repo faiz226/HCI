@@ -156,6 +156,33 @@ export default function LoginScreen() {
           <br />
           No account, no password, no cloud sync.
         </p>
+
+        {/* Register link */}
+        <p
+          style={{
+            fontSize: "0.8125rem",
+            color: "var(--muted-foreground)",
+            margin: 0,
+            textAlign: "center",
+          }}
+        >
+          Don't have an account?{" "}
+          <button
+            onClick={() => navigate({ to: "/register" })}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "var(--primary)",
+              fontWeight: 500,
+              fontSize: "0.8125rem",
+              padding: 0,
+              fontFamily: "inherit",
+            }}
+          >
+            Register
+          </button>
+        </p>
       </div>
     </div>
   );
