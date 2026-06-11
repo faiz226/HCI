@@ -4,6 +4,8 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
+  useRouterState,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -13,6 +15,35 @@ import appCss from "../styles.css?url";
 import { reportClientError } from "../lib/error-reporting";
 import { initTheme } from "../lib/theme";
 import { Toaster } from "@/components/ui/sonner";
+import { useSession } from "@/lib/session-store";
+
+// Routes that are part of the pre-auth flow — no redirect loop from these
+const PUBLIC_ROUTES = ["/splash", "/onboarding", "/login"];
+
+function AuthGuard() {
+  const { signedIn } = useSession();
+  const navigate = useNavigate();
+  const { location } = useRouterState();
+  const pathname = location.pathname;
+
+  useEffect(() => {
+    // Already on a public route — don't interfere
+    if (PUBLIC_ROUTES.includes(pathname)) return;
+
+    const onboarded = localStorage.getItem("soft-oasis-onboarded");
+
+    if (!onboarded) {
+      navigate({ to: "/splash" });
+      return;
+    }
+
+    if (!signedIn) {
+      navigate({ to: "/login" });
+    }
+  }, [signedIn, pathname, navigate]);
+
+  return null;
+}
 
 function NotFoundComponent() {
   return (
@@ -129,6 +160,7 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <AuthGuard />
       <Outlet />
       <Toaster position="top-center" />
     </QueryClientProvider>
